@@ -1,0 +1,10 @@
+# Ignore Node.js module folders
+node_modules/
+
+# Ignore all .env files in all folders
+.env
+.env.local
+
+# Ignore package logs
+npm-debug.log
+yarn-debug.log
