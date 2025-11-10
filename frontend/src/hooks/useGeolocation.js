@@ -3,35 +3,34 @@ import { useState, useEffect } from 'react';
 const useGeolocation = () => {
   const [location, setLocation] = useState(null);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true); // Start loading immediately
 
   useEffect(() => {
+    // This effect runs only once when the hook is mounted
     if (!navigator.geolocation) {
-      setError('Geolocation is not supported by your browser');
+      setError('Geolocation is not supported by your browser.');
+      setLoading(false);
       return;
     }
 
-    const handleSuccess = (position) => {
-      setLocation({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
-    };
+    // Get the current position
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setLoading(false);
+      },
+      (err) => {
+        // e.g., "User denied Geolocation"
+        setError(`Geolocation Error: ${err.message}`);
+        setLoading(false);
+      }
+    );
+  }, []); // The empty dependency array ensures this runs only once on mount
 
-    const handleError = (error) => {
-      setError(error.message);
-    };
-
-    // Request high accuracy
-    const options = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    };
-
-    navigator.geolocation.getCurrentPosition(handleSuccess, handleError, options);
-  }, []);
-
-  return { location, error };
+  return { location, error, loading };
 };
 
 export default useGeolocation;
