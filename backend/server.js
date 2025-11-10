@@ -2,7 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose from 'mongoose';
-import cookieParser from 'cookie-parser'; // ◄◄◄ FIXES YOUR 'jwt' ERROR
+import cookieParser from 'cookie-parser';
 import authRoutes from './routes/authRoutes.js';
 import lecturerRoutes from './routes/lecturerRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
@@ -19,10 +19,14 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // Log the incoming origin to see what it is
+    console.log('INCOMING ORIGIN:', origin); 
+
     if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      // ▼▼▼ THIS IS THE UPDATED LINE ▼▼▼
+      callback(new Error(`Not allowed by CORS: ${origin}`)); 
     }
   },
   credentials: true,
@@ -34,9 +38,8 @@ app.use(cors(corsOptions));
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser()); // ◄◄◄ THIS IS THE FIX FOR YOUR 'jwt' ERROR
+app.use(cookieParser()); 
 
-// Trust proxy to get correct req.ip
 app.set('trust proxy', 1);
 
 // Database Connection
