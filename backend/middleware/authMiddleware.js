@@ -6,7 +6,9 @@ import Lecturer from '../models/Lecturer.js';
 // Middleware to protect routes (check for valid token)
 const protect = asyncHandler(async (req, res, next) => {
   let token;
-  token = req.cookies.jwt; // Read the cookie
+  
+  // Read the JWT from the cookie
+  token = req.cookies.jwt; 
 
   if (token) {
     try {
@@ -41,7 +43,6 @@ const isLecturer = (req, res, next) => {
   }
 };
 
-// ▼▼▼ NEW FUNCTION ▼▼▼
 // Middleware to check if the user is a student
 const studentAuth = (req, res, next) => {
   if (req.user && req.user.role === 'student') {
@@ -51,11 +52,10 @@ const studentAuth = (req, res, next) => {
     throw new Error('Not authorized as a student');
   }
 };
-// ▲▲▲ END OF NEW FUNCTION ▲▲▲
 
 // Export all functions
 export { 
   protect, 
   isLecturer, 
-  studentAuth // ◄◄◄ MAKE SURE NEW FUNCTION IS EXPORTED
+  studentAuth 
 };

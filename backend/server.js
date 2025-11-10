@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import authRoutes from './routes/authRoutes.js';
 import lecturerRoutes from './routes/lecturerRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
+import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
