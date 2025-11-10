@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import QRCode from 'react-qr-code';
-import useGeolocation from '../hooks/useGeolocation'; // This is now automatic
+import useGeolocation from '../hooks/useGeolocation';
 
 function LecturerDashboard() {
   const [classes, setClasses] = useState([]);
@@ -13,15 +13,12 @@ function LecturerDashboard() {
   // --- States for the create class form ---
   const [newClassId, setNewClassId] = useState('');
   const [newClassName, setNewClassName] = useState('');
-  const [formLocation, setFormLocation] = useState(null); // Location for the form
+  const [formLocation, setFormLocation] = useState(null);
   const [formError, setFormError] = useState('');
   const [formLoading, setFormLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-
-  // ▼▼▼ NEW STATES FOR TOGGLE AND SLIDER ▼▼▼
   const [geofenceEnabled, setGeofenceEnabled] = useState(true);
-  const [geofenceRadius, setGeofenceRadius] = useState(100); // Default 100m
-  // ▲▲▲ NEW STATES FOR TOGGLE AND SLIDER ▲▲▲
+  const [geofenceRadius, setGeofenceRadius] = useState(100);
 
   // --- Use the automatic geolocation hook ---
   const { location: autoGeoLocation, error: autoGeoError, loading: autoGeoLoading } = useGeolocation();
@@ -29,25 +26,25 @@ function LecturerDashboard() {
   // --- Notification functions ---
   const showSuccess = (message) => {
     setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(''), 3000); // Clear after 3 seconds
+    setTimeout(() => setSuccessMessage(''), 3000);
   };
   const showFormError = (message) => {
     setFormError(message);
-    setTimeout(() => setFormError(''), 5000); // Clear after 5 seconds
+    setTimeout(() => setFormError(''), 5000);
   };
   const showSessionError = (message) => {
     setError(message);
-    setTimeout(() => setError(''), 5000); // Clear after 5 seconds
+    setTimeout(() => setError(''), 5000);
   };
 
   // --- Effect to handle automatic location ---
   useEffect(() => {
     if (autoGeoLocation) {
       setFormLocation(autoGeoLocation);
-      showSuccess('Location captured automatically!');
+      // Only show this notification once, not every time
+      // showSuccess('Location captured automatically!');
     }
     if (autoGeoError) {
-      // e.g., "User denied Geolocation"
       showFormError(autoGeoError);
     }
   }, [autoGeoLocation, autoGeoError]);
@@ -114,7 +111,6 @@ function LecturerDashboard() {
       return;
     }
     
-    // Only check for location if geofence is enabled
     if (geofenceEnabled && !formLocation) {
       showFormError('Geofence is enabled, but location is not available. Check browser permissions.');
       return;
@@ -122,7 +118,6 @@ function LecturerDashboard() {
 
     setFormLoading(true);
     try {
-      // Prepare class data, sending nulls if geofence is off
       const newClassData = {
         classId: newClassId,
         className: newClassName,
@@ -137,18 +132,33 @@ function LecturerDashboard() {
       setClasses([...classes, newClass]);
       setSelectedClass(newClass._id);
       
-      // Clear the form
       setNewClassId('');
       setNewClassName('');
       setFormLoading(false);
       showSuccess('Class created successfully!');
-      // We don't clear formLocation as it's automatic
       
     } catch (err) {
       showFormError(err.response?.data?.message || 'Failed to create class.');
       setFormLoading(false);
     }
   };
+
+  // ▼▼▼ ADD THIS NEW FUNCTION ▼▼▼
+  const handleReloadSession = async () => {
+    if (!activeSession) {
+      showSessionError('No active session to reload.');
+      return;
+    }
+    try {
+      // Send the request to our new endpoint
+      const { data } = await api.post('/api/lecturer/sessions/reload', { sessionId: activeSession._id });
+      setActiveSession(data); // Update the session state with new data
+      showSuccess('QR Code reloaded! New 5-minute timer.');
+    } catch (err) {
+      showSessionError('Failed to reload QR code.');
+    }
+  };
+  // ▲▲▲ END OF NEW FUNCTION ▲▲▲
 
   const qrUrl = activeSession 
     ? `${window.location.origin}/scan?qrCodeValue=${activeSession.qrCodeValue}` 
@@ -179,6 +189,7 @@ function LecturerDashboard() {
                 </div>
             )}
             <form onSubmit={handleCreateClass} className="space-y-4">
+              {/* ... (all your form inputs for Class ID, Name, Geofence Toggle, Slider) ... */}
               <div>
                 <label className="block text-gray-700 mb-1 text-sm">Class ID (e.g., CS101)</label>
                 <input
@@ -198,7 +209,6 @@ function LecturerDashboard() {
                 />
               </div>
               
-              {/* NEW GEOFENCE TOGGLE  */}
               <div className="flex items-center justify-between pt-2">
                 <label className="block text-gray-700 text-sm font-medium">Enable Geofence</label>
                 <input
@@ -208,9 +218,7 @@ function LecturerDashboard() {
                   className="h-5 w-5 rounded text-indigo-600"
                 />
               </div>
-             
 
-              {/* GEOFENCE SLIDER (conditional) */}
               {geofenceEnabled && (
                 <div className="pt-2">
                   <label className="block text-gray-700 mb-2 text-sm">
@@ -219,7 +227,7 @@ function LecturerDashboard() {
                   <input
                     type="range"
                     min="50"
-                    max="1000" // Max is 1000m (1km)
+                    max="1000"
                     step="50"
                     value={geofenceRadius}
                     onChange={(e) => setGeofenceRadius(Number(e.target.value))}
@@ -231,7 +239,6 @@ function LecturerDashboard() {
                     <span>1000m (1km)</span>
                   </div>
                   
-                  {/* Automatic Location Status */}
                   <div className="text-sm mt-3">
                     {autoGeoLoading && (
                       <p className="text-blue-600">... Getting location...</p>
@@ -245,7 +252,6 @@ function LecturerDashboard() {
                   </div>
                 </div>
               )}
-              {/*  NEW GEOFENCE */}
 
               <button
                 type="submit"
@@ -276,7 +282,7 @@ function LecturerDashboard() {
                 <option value="">-- Select a class --</option>
                 {classes.map((cls) => (
                   <option key={cls._id} value={cls._id}>{cls.className} ({cls.classId})</option>
-                ))}
+))}
               </select>
             </div>
             <button
@@ -301,6 +307,16 @@ function LecturerDashboard() {
                 <QRCode value={qrUrl} />
               </div>
               <p className="text-sm text-gray-600 mt-4">Session expires at: {new Date(activeSession.expirationTime).toLocaleTimeString()}</p>
+              
+              {/* ▼▼▼ ADD THIS NEW BUTTON ▼▼▼ */}
+              <button
+                onClick={handleReloadSession}
+                className="w-full py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 mt-4"
+              >
+                Reload QR Code (New 5 min)
+              </button>
+              {/* ▲▲▲ END OF NEW BUTTON ▲▲▲ */}
+
             </div>
           )}
 

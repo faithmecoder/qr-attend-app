@@ -1,40 +1,61 @@
 import jwt from 'jsonwebtoken';
-import Lecturer from '../models/Lecturer.js';
+import asyncHandler from 'express-async-handler';
 import Student from '../models/Student.js';
+import Lecturer from '../models/Lecturer.js';
 
-const protect = (role = null) => async (req, res, next) => {
+// Middleware to protect routes (check for valid token)
+const protect = asyncHandler(async (req, res, next) => {
   let token;
+  token = req.cookies.jwt; // Read the cookie
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+  if (token) {
     try {
-      token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      if (role === 'lecturer') {
-        req.user = await Lecturer.findById(decoded.userId).select('-passwordHash');
-      } else if (role === 'student') {
-        req.user = await Student.findById(decoded.userId).select('-passwordHash');
-      } else {
-        // Generic protection, just get user ID
-        req.user = { _id: decoded.userId, role: decoded.role };
-      }
-
-      if (!req.user || (role && decoded.role !== role)) {
-         return res.status(401).json({ message: 'Not authorized, invalid role' });
+      
+      // Find the user based on the role in the token
+      if (decoded.role === 'student') {
+        req.user = await Student.findById(decoded.userId).select('-password');
+      } else if (decoded.role === 'lecturer') {
+        req.user = await Lecturer.findById(decoded.userId).select('-password');
       }
 
       next();
     } catch (error) {
       console.error(error);
-      res.status(401).json({ message: 'Not authorized, token failed' });
+      res.status(401);
+      throw new Error('Not authorized, token failed');
     }
+  } else {
+    res.status(401);
+    throw new Error('Not authorized, no token');
   }
+});
 
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
+// Middleware to check if the user is a lecturer
+const isLecturer = (req, res, next) => {
+  if (req.user && req.user.role === 'lecturer') {
+    next();
+  } else {
+    res.status(401);
+    throw new Error('Not authorized as a lecturer');
   }
 };
 
-export const lecturerAuth = protect('lecturer');
-export const studentAuth = protect('student');
-export const generalAuth = protect();
+// ▼▼▼ NEW FUNCTION ▼▼▼
+// Middleware to check if the user is a student
+const studentAuth = (req, res, next) => {
+  if (req.user && req.user.role === 'student') {
+    next();
+  } else {
+    res.status(401);
+    throw new Error('Not authorized as a student');
+  }
+};
+// ▲▲▲ END OF NEW FUNCTION ▲▲▲
+
+// Export all functions
+export { 
+  protect, 
+  isLecturer, 
+  studentAuth // ◄◄◄ MAKE SURE NEW FUNCTION IS EXPORTED
+};
