@@ -15,23 +15,23 @@ const app = express();
 const allowedOrigins = [
   'https://qr-attend-app-u66d.vercel.app',
   'https://qr-attend-app-u66d-git-main-faithmecoders-projects.vercel.app/',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'https://qr-attend-app-u66d-50q8go3mw-faithmecoders-projects.vercel.app/'
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Log the incoming origin to see what it is
-    console.log('INCOMING ORIGIN:', origin); 
-
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+    if (!origin || 
+        allowedOrigins.includes(origin) ||
+        /\.vercel\.app$/.test(origin)) {  // ✅ allow all Vercel subdomains
       callback(null, true);
     } else {
-      // ▼▼▼ THIS IS THE UPDATED LINE ▼▼▼
-      callback(new Error(`Not allowed by CORS: ${origin}`)); 
+      callback(new Error(`Not allowed by CORS: ${origin}`));
     }
   },
   credentials: true,
 };
+
 
 app.use(cors(corsOptions));
 // --- End of CORS Configuration ---
