@@ -14,6 +14,7 @@ const app = express();
 // --- CORS Configuration ---
 const allowedOrigins = [
   'https://qr-attend-app-u66d.vercel.app',
+  'https://qr-attend-app-u66d-git-main-faithmecoders-projects.vercel.app/',
   'http://localhost:5173'
 ];
 
