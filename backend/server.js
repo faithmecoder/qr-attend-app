@@ -2,10 +2,10 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose from 'mongoose';
+import cookieParser from 'cookie-parser'; // ◄◄◄ 1. IMPORT IT HERE
 import authRoutes from './routes/authRoutes.js';
 import lecturerRoutes from './routes/lecturerRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
-import cookieParser from 'cookie-parser';
 
 dotenv.config();
 
@@ -34,6 +34,7 @@ app.use(cors(corsOptions));
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); // ◄◄◄ 2. USE IT HERE (BEFORE ROUTES)
 
 // Trust proxy to get correct req.ip
 app.set('trust proxy', 1);
