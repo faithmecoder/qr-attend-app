@@ -2,7 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import mongoose from 'mongoose';
-import cookieParser from 'cookie-parser'; // ◄◄◄ 1. IMPORT IT HERE
+import cookieParser from 'cookie-parser'; // ◄◄◄ FIXES YOUR 'jwt' ERROR
 import authRoutes from './routes/authRoutes.js';
 import lecturerRoutes from './routes/lecturerRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
@@ -34,7 +34,7 @@ app.use(cors(corsOptions));
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser()); // ◄◄◄ 2. USE IT HERE (BEFORE ROUTES)
+app.use(cookieParser()); // ◄◄◄ THIS IS THE FIX FOR YOUR 'jwt' ERROR
 
 // Trust proxy to get correct req.ip
 app.set('trust proxy', 1);
