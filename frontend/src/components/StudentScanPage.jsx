@@ -1,159 +1,100 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import api from "../services/api";
 import useGeolocation from "../hooks/useGeolocation";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
 
 function StudentScanPage() {
-  const html5QrCodeRef = useRef(null);
-  const [scanStatus, setScanStatus] = useState("idle"); // idle | scanning | success | error
+  const scannerRef = useRef(null);
+  const [qrCodeValue, setQrCodeValue] = useState("");
+  const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
-  const [loadingCamera, setLoadingCamera] = useState(true);
 
+  const { location, loading: geoLoading, error: geoError } = useGeolocation();
   const { user } = useAuth();
-  const navigate = useNavigate();
-
-  const { location, error: geoError } = useGeolocation();
 
   useEffect(() => {
-    if (!user || user.role !== "student") {
-      navigate("/login");
-      return;
-    }
+    const scanner = new Html5Qrcode("qr-reader");
+    scannerRef.current = scanner;
 
-    startScanner();
+    scanner
+      .start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: 250,
+        },
+        (decoded) => {
+          setQrCodeValue(decoded);
+          scanner.stop();
+        }
+      )
+      .catch((err) => console.error(err));
 
     return () => {
-      stopScanner();
+      scanner.stop().catch(() => {});
     };
   }, []);
 
-  const startScanner = async () => {
-    if (!html5QrCodeRef.current) {
-      html5QrCodeRef.current = new Html5Qrcode("qr-reader");
+  const submitAttendance = async () => {
+    if (!qrCodeValue) {
+      setMessage("Scan a QR code first");
+      return;
     }
-
-    setScanStatus("scanning");
-    setLoadingCamera(true);
-
-    const qrConfig = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 }
-    };
-
-    try {
-      // Try rear camera first
-      await html5QrCodeRef.current.start(
-        { facingMode: { exact: "environment" } },
-        qrConfig,
-        onScanSuccess
-      );
-    } catch (err) {
-      console.warn("Rear camera not available, falling back to front camera.");
-
-      // Fall back to front camera
-      try {
-        await html5QrCodeRef.current.start(
-          { facingMode: "user" },
-          qrConfig,
-          onScanSuccess
-        );
-      } catch (err2) {
-        console.error("Camera start failed:", err2);
-        setScanStatus("error");
-        setMessage("Unable to access your camera. Please allow camera permissions.");
-      }
-    }
-
-    setLoadingCamera(false);
-  };
-
-  const stopScanner = async () => {
-    try {
-      if (html5QrCodeRef.current?.isScanning) {
-        await html5QrCodeRef.current.stop();
-      }
-    } catch (err) {
-      console.warn("Scanner stop error:", err);
-    }
-  };
-
-  const onScanSuccess = async (decodedText) => {
-    stopScanner();
-    setScanStatus("success");
-    setMessage("QR detected. Submitting attendance...");
 
     if (!location) {
-      setScanStatus("error");
-      setMessage("Location required. Please enable location and try again.");
+      setMessage("Location is required");
       return;
     }
 
     try {
+      setStatus("loading");
+
       const { data } = await api.post("/api/attendance", {
-        qrCodeValue: decodedText,
+        qrCodeValue,
         latitude: location.latitude,
-        longitude: location.longitude
+        longitude: location.longitude,
       });
 
-      setMessage(data.message || "Attendance marked successfully!");
+      setMessage(data.message);
+      setStatus("success");
     } catch (err) {
-      setScanStatus("error");
-      setMessage(err.response?.data?.message || "Error marking attendance.");
+      setMessage(err.response?.data?.message || "Error submitting");
+      setStatus("error");
     }
   };
 
-  const getStatusColor = () => {
-    if (scanStatus === "success") return "bg-green-100 text-green-800";
-    if (scanStatus === "error") return "bg-red-100 text-red-800";
-    return "bg-gray-100 text-gray-800";
-  };
-
   return (
-    <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-md mt-10">
+    <div className="max-w-md mx-auto bg-white p-6 shadow rounded">
       <h2 className="text-2xl font-bold text-center mb-4">Scan QR Code</h2>
-
-      <p className="text-center text-gray-600 mb-6">
-        Logged in as <span className="font-semibold">{user?.name}</span>
+      <p className="text-gray-700 mb-4 text-center">
+        Logged in as <strong>{user.name}</strong>
       </p>
 
-      {/* Geolocation status */}
-      {!location && !geoError && (
-        <p className="text-blue-600 text-sm mb-4 text-center">
-          Requesting location permission…
-        </p>
-      )}
+      {geoLoading && <p className="text-blue-600">Getting your location...</p>}
+      {geoError && <p className="text-red-600">{geoError}</p>}
 
-      {geoError && (
-        <p className="text-red-600 text-center mb-4">
-          Location Error: {geoError}
-        </p>
-      )}
+      <div id="qr-reader" className="w-full mx-auto mb-4" style={{ height: "280px" }}></div>
 
-      {/* Scanner area */}
-      <div id="qr-reader" className="w-full rounded-md overflow-hidden bg-gray-200" style={{ minHeight: "260px" }}>
-        {loadingCamera && (
-          <p className="text-center text-gray-600 py-10">Loading camera…</p>
-        )}
-      </div>
-
-      {/* Status message */}
       {message && (
-        <div className={`mt-4 p-3 text-center rounded ${getStatusColor()}`}>
+        <div
+          className={`p-3 text-center rounded mb-4 ${
+            status === "success"
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
           {message}
         </div>
       )}
 
-      {/* Retry scan button */}
-      {scanStatus !== "scanning" && (
-        <button
-          onClick={startScanner}
-          className="mt-4 w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-        >
-          Scan Again
-        </button>
-      )}
+      <button
+        onClick={submitAttendance}
+        disabled={status === "loading" || !qrCodeValue}
+        className="w-full bg-indigo-600 text-white py-3 rounded-lg"
+      >
+        {status === "loading" ? "Submitting..." : "Submit Attendance"}
+      </button>
     </div>
   );
 }
