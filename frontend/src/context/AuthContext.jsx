@@ -1,43 +1,46 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import api from '../services/api';
+// src/context/AuthContext.jsx
+import React, { createContext, useContext, useEffect, useState } from "react";
+import api from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [token, setTokenState] = useState(localStorage.getItem("token"));
+  const [user, setUserState] = useState(
+    JSON.parse(localStorage.getItem("user")) || null
+  );
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    if (userInfo) {
-      setUser(userInfo);
+  const navigate = useNavigate();
+
+  // Keep axios interceptor behavior as-is (api attaches token from localStorage).
+  // If token exists but no user, optionally you could fetch profile here (not required).
+
+  const login = (tokenValue, userObj) => {
+    if (tokenValue) {
+      localStorage.setItem("token", tokenValue);
+      setTokenState(tokenValue);
     }
-    setLoading(false);
-  }, []);
-
-  const login = async (email, password) => {
-    const { data } = await api.post('/api/auth/login', { email, password });
-    localStorage.setItem('userInfo', JSON.stringify(data));
-    setUser(data);
-    return data;
-  };
-
-  const register = async (userData, role) => {
-    const url = role === 'lecturer' ? '/api/auth/register-lecturer' : '/api/auth/register-student';
-    const { data } = await api.post(url, userData);
-    localStorage.setItem('userInfo', JSON.stringify(data));
-    setUser(data);
-    return data;
+    if (userObj) {
+      localStorage.setItem("user", JSON.stringify(userObj));
+      setUserState(userObj);
+    }
   };
 
   const logout = () => {
-    localStorage.removeItem('userInfo');
-    setUser(null);
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    setTokenState(null);
+    setUserState(null);
+    navigate("/login");
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
-      {!loading && children}
+    <AuthContext.Provider
+      value={{ token, setToken: setTokenState, user, setUser: setUserState, login, logout, loading, setLoading }}
+    >
+      {children}
     </AuthContext.Provider>
   );
 };

@@ -1,27 +1,43 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+import mongoose from "mongoose";
 
-const studentSchema = new mongoose.Schema({
-  studentId: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  passwordHash: { type: String, required: true },
-  registeredClasses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }]
-}, { timestamps: true });
+const StudentSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-// Hash password before saving
-studentSchema.pre('save', async function (next) {
-  if (!this.isModified('passwordHash')) {
-    next();
-  }
-  const salt = await bcrypt.genSalt(10);
-  this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-});
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+    },
 
-// Method to compare passwords
-studentSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.passwordHash);
-};
+    password: {
+      type: String,
+      required: true,
+    },
 
-const Student = mongoose.model('Student', studentSchema);
+    role: {
+      type: String,
+      default: "student",
+      enum: ["student", "lecturer"],
+    },
+
+    studentId: {
+      type: String,
+      required: true,
+    },
+
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { timestamps: true }
+);
+
+const Student = mongoose.model("Student", StudentSchema);
 export default Student;

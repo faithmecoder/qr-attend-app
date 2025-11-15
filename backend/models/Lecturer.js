@@ -1,27 +1,44 @@
-import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
+import mongoose from "mongoose";
 
-const lecturerSchema = new mongoose.Schema({
-  lecturerId: { type: String, required: true, unique: true },
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  passwordHash: { type: String, required: true },
-  classesTaught: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Class' }]
-}, { timestamps: true });
+const LecturerSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-// Hash password before saving
-lecturerSchema.pre('save', async function (next) {
-  if (!this.isModified('passwordHash')) {
-    next();
-  }
-  const salt = await bcrypt.genSalt(10);
-  this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-});
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+    },
 
-// Method to compare passwords
-lecturerSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.passwordHash);
-};
+    password: {
+      type: String,
+      required: true,
+    },
 
-const Lecturer = mongoose.model('Lecturer', lecturerSchema);
+    role: {
+      type: String,
+      default: "lecturer",
+      enum: ["lecturer", "student"],
+    },
+
+    // NEW FIELD: Lecturer can turn geofencing ON/OFF
+    geofencingEnabled: {
+      type: Boolean,
+      default: true, // geofencing ON by default
+    },
+
+    createdAt: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  { timestamps: true }
+);
+
+const Lecturer = mongoose.model("Lecturer", LecturerSchema);
 export default Lecturer;

@@ -1,22 +1,14 @@
-import React from 'react';
-import { useLocation, Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+// src/components/RequireAuth.jsx
+import React from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
-function RequireAuth({ children, role }) {
-  const { user } = useAuth();
-  const location = useLocation();
+export default function RequireAuth({ children, role }) {
+  const { user, token } = useAuth();
 
-  if (!user) {
-    // Redirect them to the /login page, but save the current location
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+  if (!token) return <Navigate to="/login" />;
 
-  if (user.role !== role) {
-    // Redirect them to a "not authorized" page or home
-    return <Navigate to="/" state={{ from: location }} replace />;
-  }
+  if (role && user?.role !== role) return <Navigate to="/login" />;
 
   return children;
 }
-
-export default RequireAuth;

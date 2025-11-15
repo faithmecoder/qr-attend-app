@@ -1,349 +1,369 @@
-import React, { useState, useEffect } from 'react';
-import api from '../services/api';
-import QRCode from 'react-qr-code';
-import useGeolocation from '../hooks/useGeolocation';
+import React, { useState, useEffect } from "react";
+import api from "../services/api";
+import QRCode from "react-qr-code";
+import useGeolocation from "../hooks/useGeolocation";
 
 function LecturerDashboard() {
+  // -----------------------
+  // States
+  // -----------------------
   const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState('');
+  const [selectedClass, setSelectedClass] = useState("");
   const [activeSession, setActiveSession] = useState(null);
+  const [countdown, setCountdown] = useState(0);
   const [attendance, setAttendance] = useState([]);
-  const [error, setError] = useState('');
-  
-  // --- States for the create class form ---
-  const [newClassId, setNewClassId] = useState('');
-  const [newClassName, setNewClassName] = useState('');
-  const [formLocation, setFormLocation] = useState(null);
-  const [formError, setFormError] = useState('');
-  const [formLoading, setFormLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [geofenceEnabled, setGeofenceEnabled] = useState(true);
+
+  // Create Class states (unchanged)
+  const [newClassId, setNewClassId] = useState("");
+  const [newClassName, setNewClassName] = useState("");
+  const [geofenceEnabled, setGeofenceEnabled] = useState(false);
   const [geofenceRadius, setGeofenceRadius] = useState(100);
 
-  // --- Use the automatic geolocation hook ---
-  const { location: autoGeoLocation, error: autoGeoError, loading: autoGeoLoading } = useGeolocation();
+  // Session-specific geofence (new)
+  const [sessionGeofenceEnabled, setSessionGeofenceEnabled] = useState(false);
+  const [sessionGeofenceRadius, setSessionGeofenceRadius] = useState(100);
 
-  // --- Notification functions ---
-  const showSuccess = (message) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(''), 3000);
-  };
-  const showFormError = (message) => {
-    setFormError(message);
-    setTimeout(() => setFormError(''), 5000);
-  };
-  const showSessionError = (message) => {
-    setError(message);
-    setTimeout(() => setError(''), 5000);
+  // location for create-class and session creation
+  const { location: autoGeoLocation, error: autoGeoError, loading: autoGeoLoading } =
+    useGeolocation();
+  const [formLocation, setFormLocation] = useState(null);
+
+  // edit modal (if you had it)
+  const [editClass, setEditClass] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
+
+  // messages
+  const [formError, setFormError] = useState("");
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // -----------------------
+  // Helpers
+  // -----------------------
+  const showSuccess = (msg) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(""), 3000);
   };
 
-  // --- Effect to handle automatic location ---
+  const showFormError = (msg) => {
+    setFormError(msg);
+    setTimeout(() => setFormError(""), 4000);
+  };
+
+  const showSessionError = (msg) => {
+    setError(msg);
+    setTimeout(() => setError(""), 4000);
+  };
+
+  // -----------------------
+  // Auto-update form location
+  // -----------------------
   useEffect(() => {
-    if (autoGeoLocation) {
-      setFormLocation(autoGeoLocation);
-      // Only show this notification once, not every time
-      // showSuccess('Location captured automatically!');
-    }
-    if (autoGeoError) {
-      showFormError(autoGeoError);
-    }
-  }, [autoGeoLocation, autoGeoError]);
+    if (autoGeoLocation) setFormLocation(autoGeoLocation);
+  }, [autoGeoLocation]);
 
-  // --- Fetch existing classes ---
+  // -----------------------
+  // Load classes on mount
+  // -----------------------
   useEffect(() => {
     const fetchClasses = async () => {
       try {
-        const { data } = await api.get('/api/lecturer/classes');
-        setClasses(data);
-        if (data.length > 0) {
-          setSelectedClass(data[0]._id);
-        }
+        const { data } = await api.get("/api/lecturer/classes");
+        setClasses(data || []);
+        if (data && data.length > 0) setSelectedClass(data[0]._id);
       } catch (err) {
-        showSessionError('Failed to fetch classes.');
+        showSessionError("Failed to load classes.");
       }
     };
     fetchClasses();
   }, []);
 
-  // --- Poll for attendance during active session ---
+  // -----------------------
+  // Poll attendance for active session
+  // -----------------------
   useEffect(() => {
-    let intervalId;
+    let interval;
     if (activeSession) {
       const fetchAttendance = async () => {
         try {
-          const { data } = await api.get(`/api/lecturer/sessions/${activeSession._id}/attendance`);
-          setAttendance(data);
+          const { data } = await api.get(
+            `/api/lecturer/sessions/${activeSession._id}/attendance`
+          );
+          setAttendance(data || []);
         } catch (err) {
-          console.error('Failed to fetch attendance');
+          console.error("Failed to fetch attendance", err);
         }
       };
-      
       fetchAttendance();
-      intervalId = setInterval(fetchAttendance, 5000);
+      interval = setInterval(fetchAttendance, 5000);
     }
-    return () => clearInterval(intervalId);
+    return () => clearInterval(interval);
   }, [activeSession]);
 
-  // --- Function to start a session ---
-  const startSession = async () => {
-    if (!selectedClass) {
-      showSessionError('Please select a class.');
-      return;
-    }
-    setError('');
-    try {
-      const { data } = await api.post('/api/lecturer/sessions/start', { classId: selectedClass });
-      setActiveSession(data);
-      setAttendance([]); 
-      showSuccess('Session started successfully!');
-    } catch (err) {
-      showSessionError('Failed to start session.');
-    }
-  };
+  // -----------------------
+  // Countdown timer for active session
+  // -----------------------
+  useEffect(() => {
+    if (!activeSession) return;
 
-  // --- Function to create a new class ---
+    const interval = setInterval(() => {
+      const now = new Date();
+      const expire = new Date(activeSession.expirationTime);
+      const secLeft = Math.max(Math.floor((expire - now) / 1000), 0);
+      setCountdown(secLeft);
+
+      if (secLeft <= 0) {
+        clearInterval(interval);
+        showSessionError("QR expired. Reload session.");
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
+  // -----------------------
+  // Create class (unchanged)
+  // -----------------------
   const handleCreateClass = async (e) => {
     e.preventDefault();
-    setFormError('');
 
-    if (!newClassId || !newClassName) {
-      showFormError('Class ID and Name are required.');
-      return;
-    }
-    
-    if (geofenceEnabled && !formLocation) {
-      showFormError('Geofence is enabled, but location is not available. Check browser permissions.');
-      return;
-    }
+    if (!newClassId || !newClassName) return showFormError("Class ID & Name required");
+    if (geofenceEnabled && !formLocation) return showFormError("GPS required for geofence");
 
-    setFormLoading(true);
     try {
-      const newClassData = {
+      const payload = {
         classId: newClassId,
         className: newClassName,
-        geofenceEnabled: geofenceEnabled,
-        latitude: geofenceEnabled ? formLocation.latitude : null,
-        longitude: geofenceEnabled ? formLocation.longitude : null,
-        geofenceRadius: geofenceEnabled ? geofenceRadius : null
+        geofenceEnabled,
+        latitude: geofenceEnabled ? formLocation?.lat : null,
+        longitude: geofenceEnabled ? formLocation?.lng : null,
+        geofenceRadius: geofenceEnabled ? geofenceRadius : null,
       };
-      
-      const { data: newClass } = await api.post('/api/lecturer/classes', newClassData);
-      
-      setClasses([...classes, newClass]);
-      setSelectedClass(newClass._id);
-      
-      setNewClassId('');
-      setNewClassName('');
-      setFormLoading(false);
-      showSuccess('Class created successfully!');
-      
+
+      const { data } = await api.post("/api/lecturer/classes", payload);
+
+      if (!classes.find((c) => c._id === data.newClass._id)) {
+        setClasses([...classes, data.newClass]);
+      }
+
+      setSelectedClass(data.newClass._id);
+      setNewClassId("");
+      setNewClassName("");
+      setGeofenceEnabled(false);
+      setGeofenceRadius(100);
+
+      showSuccess(data.message);
     } catch (err) {
-      showFormError(err.response?.data?.message || 'Failed to create class.');
-      setFormLoading(false);
+      console.error(err);
+      showFormError(err.response?.data?.message || "Class creation failed");
     }
   };
 
-  // ▼▼▼ ADD THIS NEW FUNCTION ▼▼▼
-  const handleReloadSession = async () => {
+  // -----------------------
+  // Start session (UPDATED to include session-specific geofence)
+  // -----------------------
+  const startSession = async () => {
+    if (!selectedClass) {
+      showSessionError("Please select a class.");
+      return;
+    }
+
+    if (sessionGeofenceEnabled && !formLocation) {
+      showSessionError("Cannot enable session geofence: location not available.");
+      return;
+    }
+
+    try {
+      const payload = {
+        classId: selectedClass,
+        geofenceEnabled: sessionGeofenceEnabled,
+        latitude: sessionGeofenceEnabled ? formLocation?.lat : null,
+        longitude: sessionGeofenceEnabled ? formLocation?.lng : null,
+        geofenceRadius: sessionGeofenceEnabled ? sessionGeofenceRadius : null,
+      };
+
+      const { data } = await api.post("/api/lecturer/sessions/start", payload);
+
+      setActiveSession(data);
+      setAttendance([]);
+      showSuccess("Session started!");
+    } catch (err) {
+      console.error(err);
+      showSessionError(err.response?.data?.message || "Failed to start session.");
+    }
+  };
+
+  // -----------------------
+  // Reload session (regenerate QR)
+  // -----------------------
+  const reloadSession = async () => {
     if (!activeSession) {
-      showSessionError('No active session to reload.');
+      showSessionError("No active session to reload.");
       return;
     }
     try {
-      // Send the request to our new endpoint
-      const { data } = await api.post('/api/lecturer/sessions/reload', { sessionId: activeSession._id });
-      setActiveSession(data); // Update the session state with new data
-      showSuccess('QR Code reloaded! New 5-minute timer.');
+      const { data } = await api.post("/api/lecturer/sessions/reload", {
+        sessionId: activeSession._id,
+      });
+      setActiveSession(data);
+      showSuccess("QR reloaded!");
     } catch (err) {
-      showSessionError('Failed to reload QR code.');
+      console.error(err);
+      showSessionError(err.response?.data?.message || "Failed to reload session.");
     }
   };
-  // ▲▲▲ END OF NEW FUNCTION ▲▲▲
 
-  const qrUrl = activeSession 
-    ? `${window.location.origin}/scan?qrCodeValue=${activeSession.qrCodeValue}` 
-    : '';
+  const qrUrl = activeSession ? `${window.location.origin}/scan?qrCodeValue=${activeSession.qrCodeValue}` : "";
 
+  // -----------------------
+  // Save edited class (if you have edit modal)
+  // -----------------------
+  const saveClassChanges = async () => {
+    if (!editClass) return;
+    setEditLoading(true);
+    try {
+      const payload = {
+        className: editClass.className,
+        geofenceEnabled: editClass.geofenceEnabled,
+        latitude: editClass.geofenceEnabled ? formLocation?.lat : null,
+        longitude: editClass.geofenceEnabled ? formLocation?.lng : null,
+        geofenceRadius: editClass.geofenceRadius || 100,
+      };
+
+      await api.put(`/api/lecturer/classes/${editClass._id}`, payload);
+      showSuccess("Class updated");
+      setEditClass(null);
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      showSessionError("Failed to update class.");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const deleteClass = async () => {
+    if (!editClass) return;
+    if (!window.confirm("Delete class?")) return;
+    try {
+      await api.delete(`/api/lecturer/classes/${editClass._1d}`);
+      showSuccess("Deleted class");
+      setEditClass(null);
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+      showSessionError("Failed to delete class");
+    }
+  };
+
+  // -----------------------
+  // Render
+  // -----------------------
   return (
-    <div className="max-w-7xl mx-auto">
-      {/* Notification Display Area */}
+    <div className="max-w-6xl mx-auto p-4">
       {successMessage && (
-        <div className="fixed top-20 right-5 bg-green-500 text-white p-4 rounded-lg shadow-lg z-50">
+        <div className="fixed top-20 right-5 bg-green-500 text-white p-3 rounded shadow">
           {successMessage}
         </div>
       )}
 
       <h1 className="text-3xl font-bold mb-6">Lecturer Dashboard</h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* COLUMN 1: CREATE CLASS & START SESSION */}
-        <div className="lg:col-span-1 space-y-8">
-          
-          {/* CREATE CLASS FORM CARD */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-semibold mb-4">Create New Class</h2>
-            {formError && (
-                <div className="bg-red-100 text-red-700 p-3 rounded mb-4 text-sm">
-                  {formError}
-                </div>
-            )}
-            <form onSubmit={handleCreateClass} className="space-y-4">
-              {/* ... (all your form inputs for Class ID, Name, Geofence Toggle, Slider) ... */}
-              <div>
-                <label className="block text-gray-700 mb-1 text-sm">Class ID (e.g., CS101)</label>
-                <input
-                  type="text"
-                  value={newClassId}
-                  onChange={(e) => setNewClassId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-1 text-sm">Class Name (e.g., Intro to CS)</label>
-                <input
-                  type="text"
-                  value={newClassName}
-                  onChange={(e) => setNewClassName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg"
-                />
-              </div>
-              
-              <div className="flex items-center justify-between pt-2">
-                <label className="block text-gray-700 text-sm font-medium">Enable Geofence</label>
-                <input
-                  type="checkbox"
-                  checked={geofenceEnabled}
-                  onChange={(e) => setGeofenceEnabled(e.target.checked)}
-                  className="h-5 w-5 rounded text-indigo-600"
-                />
-              </div>
 
-              {geofenceEnabled && (
-                <div className="pt-2">
-                  <label className="block text-gray-700 mb-2 text-sm">
-                    Geofence Radius: <span className="font-bold">{geofenceRadius} meters</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="50"
-                    max="1000"
-                    step="50"
-                    value={geofenceRadius}
-                    onChange={(e) => setGeofenceRadius(Number(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>50m</span>
-                    <span>500m</span>
-                    <span>1000m (1km)</span>
-                  </div>
-                  
-                  <div className="text-sm mt-3">
-                    {autoGeoLoading && (
-                      <p className="text-blue-600">... Getting location...</p>
-                    )}
-                    {autoGeoError && (
-                      <p className="text-red-600">✗ Location permission denied. Geofence will not work.</p>
-                    )}
-                    {formLocation && !autoGeoError && (
-                       <p className="text-green-600">✓ Location captured automatically.</p>
-                    )}
-                  </div>
-                </div>
-              )}
+      {/* CREATE CLASS */}
+      <div className="bg-white p-6 rounded shadow mb-6">
+        <h2 className="text-xl font-semibold mb-4">Create New Class</h2>
 
-              <button
-                type="submit"
-                disabled={formLoading}
-                className="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
-              >
-                {formLoading ? 'Creating...' : 'Create Class'}
-              </button>
-            </form>
+        {formError && <div className="bg-red-100 text-red-700 p-3 mb-4 rounded">{formError}</div>}
+
+        <form onSubmit={handleCreateClass} className="space-y-4">
+          <div>
+            <label className="text-sm">Class ID</label>
+            <input value={newClassId} onChange={(e) => setNewClassId(e.target.value)} className="w-full p-2 border rounded" />
           </div>
 
-          {/* START SESSION CARD */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-semibold mb-4">Start Session</h2>
-            {error && (
-              <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
-                {error}
-              </div>
-            )}
-            <div className="mb-4">
-              <label className="block text-gray-700 mb-2">Select Existing Class:</label>
-              <select
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                disabled={activeSession}
-              >
-                <option value="">-- Select a class --</option>
-                {classes.map((cls) => (
-                  <option key={cls._id} value={cls._id}>{cls.className} ({cls.classId})</option>
-))}
-              </select>
-            </div>
-            <button
-              onClick={startSession}
-              disabled={activeSession || !selectedClass}
-              className="w-full py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400"
-            >
-              {activeSession ? 'Session Active' : 'Start Class / Generate QR'}
-            </button>
+          <div>
+            <label className="text-sm">Class Name</label>
+            <input value={newClassName} onChange={(e) => setNewClassName(e.target.value)} className="w-full p-2 border rounded" />
           </div>
-        </div>
 
-        {/* COLUMN 2 & 3: ACTIVE SESSION & ATTENDANCE */}
-        <div className="lg:col-span-2 space-y-8">
-          
-          {/* QR CODE CARD */}
-          {activeSession && (
-            <div className="bg-white p-6 rounded-lg shadow text-center">
-              <h2 className="text-2xl font-semibold mb-4">Active Session</h2>
-              <p className="font-medium mb-4">Scan this code to mark attendance:</p>
-              <div className="inline-block bg-white p-4 rounded">
-                <QRCode value={qrUrl} />
-              </div>
-              <p className="text-sm text-gray-600 mt-4">Session expires at: {new Date(activeSession.expirationTime).toLocaleTimeString()}</p>
-              
-              {/* ▼▼▼ ADD THIS NEW BUTTON ▼▼▼ */}
-              <button
-                onClick={handleReloadSession}
-                className="w-full py-2 px-4 bg-green-600 text-white rounded-lg hover:bg-green-700 mt-4"
-              >
-                Reload QR Code (New 5 min)
-              </button>
-              {/* ▲▲▲ END OF NEW BUTTON ▲▲▲ */}
+          <div className="flex justify-between items-center">
+            <label className="text-sm">Enable Geofence (class default)</label>
+            <input type="checkbox" checked={geofenceEnabled} onChange={(e) => setGeofenceEnabled(e.target.checked)} />
+          </div>
 
-            </div>
+          {geofenceEnabled && (
+            <>
+              <label className="text-sm">Radius: <strong>{geofenceRadius}m</strong></label>
+              <input type="range" min="50" max="1000" step="50" value={geofenceRadius} onChange={(e) => setGeofenceRadius(Number(e.target.value))} className="w-full" />
+              {formLocation && <p className="text-green-600 text-sm">✓ Location: {formLocation.lat}, {formLocation.lng}</p>}
+            </>
           )}
 
-          {/* LIVE ATTENDANCE CARD */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-2xl font-semibold mb-4">Live Attendance</h2>
-            {activeSession ? (
-              <ul className="divide-y divide-gray-200">
-                {attendance.length > 0 ? attendance.map((record) => (
-                  <li key={record._id} className="py-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-gray-900">{record.studentId?.name || 'Unknown Student'}</p>
-                      <p className="text-sm text-gray-500">{record.studentId?.studentId || 'N/A'}</p>
-                    </div>
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${record.isProxy ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                      {record.isProxy ? 'Geofence Fail' : 'Present'}
-                    </span>
-                  </li>
-                )) : (
-                  <p className="text-gray-500">No students have checked in yet.</p>
-                )}
-              </ul>
-            ) : (
-              <p className="text-gray-500">No active session. Start a session to see live attendance.</p>
-            )}
-          </div>
+          <button className="w-full bg-blue-600 text-white p-2 rounded">Create Class</button>
+        </form>
+      </div>
+
+      {/* START SESSION */}
+      <div className="bg-white p-6 rounded shadow mb-6">
+        <h2 className="text-xl font-semibold mb-4">Start Session</h2>
+
+        {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+
+        <select value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)} className="w-full p-2 border rounded mb-4">
+          <option value="">Select class</option>
+          {classes.map((cls) => <option key={cls._id} value={cls._id}>{cls.className} ({cls.classId})</option>)}
+        </select>
+
+        <div className="mt-3 mb-3 border p-3 rounded">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={sessionGeofenceEnabled} onChange={(e) => setSessionGeofenceEnabled(e.target.checked)} />
+            Enable Geofence for THIS session (optional)
+          </label>
+
+          {sessionGeofenceEnabled && (
+            <>
+              <p className="text-sm text-gray-600 mt-2">{autoGeoLoading ? "...Getting location" : (autoGeoError ? "Location permission denied" : (formLocation ? `Location captured: ${formLocation.lat}, ${formLocation.lng}` : "Waiting for location..."))}</p>
+
+              <label className="block mt-2 text-sm">Radius: {sessionGeofenceRadius}m</label>
+              <input type="range" min="50" max="1000" step="50" value={sessionGeofenceRadius} onChange={(e) => setSessionGeofenceRadius(Number(e.target.value))} className="w-full" />
+            </>
+          )}
         </div>
+
+        <button onClick={startSession} disabled={!selectedClass} className="w-full bg-indigo-600 text-white p-2 rounded">Start Session / Generate QR</button>
+
+        {activeSession && (
+          <div className="text-center mt-6">
+            <QRCode value={qrUrl} size={200} />
+            <p className="mt-2">Expires in: <strong>{countdown}s</strong></p>
+            <button onClick={reloadSession} className="w-full mt-3 bg-green-600 text-white p-2 rounded">Reload QR Code</button>
+          </div>
+        )}
+      </div>
+
+      {/* LIVE ATTENDANCE */}
+      <div className="bg-white p-6 rounded shadow">
+        <h2 className="text-xl font-semibold mb-4">Live Attendance</h2>
+
+        {!activeSession ? (
+          <p>No active session.</p>
+        ) : attendance.length === 0 ? (
+          <p>No students have marked attendance yet.</p>
+        ) : (
+          <ul className="divide-y">
+            {attendance.map((rec) => (
+              <li key={rec._id} className="py-3 flex justify-between">
+                <div>
+                  <p className="font-medium">{rec.studentId?.name}</p>
+                  <p className="text-sm text-gray-500">{rec.studentId?.studentId}</p>
+                </div>
+                <span className={`px-3 py-1 rounded text-xs ${rec.isProxy ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"}`}>
+                  {rec.isProxy ? "Proxy / Outside Area" : "Present"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
