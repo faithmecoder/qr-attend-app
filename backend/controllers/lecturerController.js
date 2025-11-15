@@ -1,78 +1,56 @@
+// backend/controllers/lecturerController.js
 import Lecturer from "../models/Lecturer.js";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import generateAndSetToken from "../utils/generateToken.js";
 
-// ============================
-// REGISTER LECTURER
-// ============================
 export const registerLecturer = async (req, res) => {
   try {
-    const { name, email, password, geofence } = req.body;
+    const { name, email, password } = req.body;
+    if (!name || !email || !password)
+      return res.status(400).json({ message: "Missing fields" });
 
-    // Check if lecturer already exists
     const existing = await Lecturer.findOne({ email });
-    if (existing)
-      return res.status(400).json({ message: "Lecturer already exists" });
+    if (existing) return res.status(400).json({ message: "Lecturer exists" });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create new lecturer with optional geofencing
-    const newLecturer = new Lecturer({
-      name,
-      email,
-      password: hashedPassword,
-      role: "lecturer",
-      geofence: geofence || null,  // <--- IMPORTANT FIX
-    });
-
+    const hashed = await bcrypt.hash(password, 10);
+    const newLecturer = new Lecturer({ name, email, password: hashed });
     await newLecturer.save();
 
     res.status(201).json({ message: "Lecturer registered successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+  } catch (err) {
+    console.error("registerLecturer error:", err);
+    res.status(500).json({ message: err.message });
   }
 };
 
-// ============================
-// LOGIN LECTURER
-// ============================
 export const loginLecturer = async (req, res) => {
   try {
     const { email, password } = req.body;
-    console.log("LOGIN REQUEST BODY:", req.body);
-
-
+    if (!email || !password) return res.status(400).json({ message: "Missing fields" });
 
     const lecturer = await Lecturer.findOne({ email });
-    console.log("LECTURER FROM DB:", lecturer);
-
-    if (!lecturer)
-      return res.status(400).json({ message: "Invalid credentials" });
+    if (!lecturer) return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, lecturer.password);
-    if (!isMatch)
-      return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
 
-    const token = jwt.sign(
-      { id: lecturer._id, role: "lecturer" },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    generateAndSetToken(res, lecturer._id, "lecturer");
 
-    // Normalize output to match frontend
-    res.json({
-      token,
-      user: {
-        id: lecturer._id,
-        name: lecturer.name,
-        email: lecturer.email,
-        role: "lecturer",
-        geofence: lecturer.geofence || null,
-      },
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error" });
+    // Return lecturer data (without password)
+    const safeLecturer = { _id: lecturer._id, name: lecturer.name, email: lecturer.email, role: lecturer.role };
+    res.status(200).json({ lecturer: safeLecturer });
+  } catch (err) {
+    console.error("loginLecturer error:", err);
+    res.status(500).json({ message: err.message });
   }
+};
+
+export const logoutLecturer = async (req, res) => {
+  // Clear cookie
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+  });
+  res.json({ message: "Logged out" });
 };

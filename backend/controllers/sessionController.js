@@ -5,20 +5,16 @@ import ClassModel from "../models/Class.js";
 import AttendanceRecord from "../models/AttendanceRecord.js";
 
 /**
- * startSession
- * Payload: { classId, geofenceEnabled, latitude, longitude, geofenceRadius }
- * Creates a session with a QR code value and expiration (5 minutes)
+ * startSession - creates a session with session-level geofence
  */
 export const startSession = async (req, res) => {
   try {
     const { classId, geofenceEnabled, latitude, longitude, geofenceRadius } = req.body;
-
-    // verify class exists
     const cls = await ClassModel.findById(classId);
     if (!cls) return res.status(404).json({ message: "Class not found" });
 
     const qrCodeValue = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex");
-    const expirationTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expirationTime = new Date(Date.now() + 5 * 60 * 1000);
 
     const newSession = await Session.create({
       classId,
@@ -39,9 +35,7 @@ export const startSession = async (req, res) => {
 };
 
 /**
- * reloadSession
- * Payload: { sessionId }
- * Generates new qrCodeValue and extends expiration
+ * reloadSession - regenerate qr and extend expiration
  */
 export const reloadSession = async (req, res) => {
   try {
@@ -49,14 +43,11 @@ export const reloadSession = async (req, res) => {
     const session = await Session.findById(sessionId);
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    // new QR and new expiration
     const qrCodeValue = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString("hex");
     session.qrCodeValue = qrCodeValue;
     session.expirationTime = new Date(Date.now() + 5 * 60 * 1000);
     session.isActive = true;
-
     await session.save();
-
     res.status(200).json(session);
   } catch (err) {
     console.error("reloadSession error:", err);
@@ -65,17 +56,12 @@ export const reloadSession = async (req, res) => {
 };
 
 /**
- * getSessionAttendance
- * GET /api/lecturer/sessions/:id/attendance
+ * getSessionAttendance - lecturer view of attendance for a session
  */
 export const getSessionAttendance = async (req, res) => {
   try {
     const sessionId = req.params.id;
-
-    const records = await AttendanceRecord.find({ sessionId })
-      .populate("studentId", "name studentId")
-      .sort({ createdAt: 1 });
-
+    const records = await AttendanceRecord.find({ sessionId }).populate("studentId", "name studentId").sort({ createdAt: 1 });
     res.status(200).json(records);
   } catch (err) {
     console.error("getSessionAttendance error:", err);
