@@ -36,26 +36,41 @@ export default function AuthPage() {
       lecturerId: "",
     });
 
+  // --------------------
+  // LOGIN (FIXED)
+  // --------------------
   const handleLogin = async () => {
     try {
-      // Try lecturer login
+      // Lecturer login
       try {
-        const res = await api.post("/api/lecturer/login", {
-          email: form.email,
-          password: form.password,
-        });
+        const res = await api.post(
+          "/api/lecturer/login",
+          {
+            email: form.email,
+            password: form.password,
+          },
+          {
+            withCredentials: true, // REQUIRED for mobile, Chrome, Safari
+          }
+        );
 
         login(res.data.lecturer);
         navigate("/dashboard");
         return;
       } catch {}
 
-      // Try student login
+      // Student login
       try {
-        const res = await api.post("/api/student/login", {
-          email: form.email,
-          password: form.password,
-        });
+        const res = await api.post(
+          "/api/student/login",
+          {
+            email: form.email,
+            password: form.password,
+          },
+          {
+            withCredentials: true, // REQUIRED
+          }
+        );
 
         login(res.data.student);
         navigate("/student/dashboard");
@@ -71,25 +86,36 @@ export default function AuthPage() {
     }
   };
 
+  // --------------------
+  // REGISTER
+  // --------------------
   const handleRegister = async () => {
     if (form.password !== form.confirmPassword)
       return setMessage({ type: "error", text: "Passwords do not match" });
 
     try {
       if (role === "lecturer") {
-        await api.post("/api/lecturer/register", {
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          lecturerId: form.lecturerId,
-        });
+        await api.post(
+          "/api/lecturer/register",
+          {
+            name: form.name,
+            email: form.email,
+            password: form.password,
+            lecturerId: form.lecturerId,
+          },
+          { withCredentials: true }
+        );
       } else {
-        await api.post("/api/student/register", {
-          name: form.name,
-          email: form.email,
-          password: form.password,
-          studentId: form.studentId,
-        });
+        await api.post(
+          "/api/student/register",
+          {
+            name: form.name,
+            email: form.email,
+            password: form.password,
+            studentId: form.studentId,
+          },
+          { withCredentials: true }
+        );
       }
 
       setMessage({ type: "success", text: "Registration successful!" });
@@ -123,22 +149,14 @@ export default function AuthPage() {
 
         <div className="flex justify-center gap-3 mb-4">
           <button
-            className={`px-3 py-1 rounded ${
-              mode === "login"
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-200"
-            }`}
+            className={`px-3 py-1 rounded ${mode === "login" ? "bg-indigo-600 text-white" : "bg-gray-200"}`}
             onClick={() => setMode("login")}
           >
             Login
           </button>
 
           <button
-            className={`px-3 py-1 rounded ${
-              mode === "register"
-                ? "bg-indigo-600 text-white"
-                : "bg-gray-200"
-            }`}
+            className={`px-3 py-1 rounded ${mode === "register" ? "bg-indigo-600 text-white" : "bg-gray-200"}`}
             onClick={() => setMode("register")}
           >
             Register
@@ -238,11 +256,7 @@ export default function AuthPage() {
             disabled={loading}
             className="w-full bg-indigo-600 text-white p-2 rounded"
           >
-            {loading
-              ? "Please wait..."
-              : mode === "login"
-              ? "Login"
-              : "Register"}
+            {loading ? "Please wait..." : mode === "login" ? "Login" : "Register"}
           </button>
         </form>
       </div>

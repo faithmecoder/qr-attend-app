@@ -1,3 +1,4 @@
+// frontend/src/pages/StudentDashboard.jsx
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
 import { Link } from "react-router-dom";
@@ -12,7 +13,8 @@ function StudentDashboard() {
   useEffect(() => {
     const fetchAttendance = async () => {
       try {
-        const { data } = await api.get("/api/students/attendance");
+        // FIXED ROUTE (no "students")
+        const { data } = await api.get("/api/student/attendance");
         setAttendanceList(data || []);
       } catch (err) {
         console.error("Failed to load attendance", err);
@@ -57,7 +59,9 @@ function StudentDashboard() {
             {attendanceList.map((rec) => (
               <li key={rec._id} className="py-3 flex justify-between items-center">
                 <div>
-                  <p className="font-medium">{rec.sessionId?.classId?.className || "Class"}</p>
+                  <p className="font-medium">
+                    {rec.sessionId?.classId?.className || "Class"}
+                  </p>
                   <p className="text-sm text-gray-500">
                     {new Date(rec.createdAt).toLocaleString()}
                   </p>

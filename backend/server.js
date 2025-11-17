@@ -17,12 +17,10 @@ connectDB();
 const app = express();
 
 /* -------------------------------------------
-   IMPORTANT: TRUST PROXY FOR RENDER DEPLOYMENT
-   Ensures Secure cookies work with HTTPS load balancer
+   TRUST PROXY (REQUIRED FOR RENDER & COOKIES)
 -------------------------------------------- */
 app.set("trust proxy", 1);
 
-// Body + cookie parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -31,17 +29,17 @@ app.use(cookieParser());
    CORS CONFIGURATION
 -------------------------------------------- */
 const allowedOrigins = [
-  process.env.FRONTEND_URL,  // Production frontend (Vercel)
-  "http://localhost:5173",   // Local Vite dev server
+  process.env.FRONTEND_URL,  // Vercel frontend
+  "http://localhost:5173",   // Local dev
 ];
 
-// Log allowed origins for debugging
+// Log allowed origins to debug
 console.log("Allowed CORS origins:", allowedOrigins);
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests without origin (mobile apps, Postman)
+      // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
 
       if (allowedOrigins.includes(origin)) {
@@ -49,7 +47,7 @@ app.use(
       }
 
       console.log("❌ Blocked by CORS:", origin);
-      return callback(new Error("CORS error: origin not allowed"));
+      callback(new Error("CORS error: origin not allowed"));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -57,8 +55,16 @@ app.use(
   })
 );
 
-// Enable preflight for all routes
-app.options("*", cors());
+/* -------------------------------------------
+   PRE-FLIGHT CORS FIX (IMPORTANT FOR CHROME)
+-------------------------------------------- */
+app.options(
+  "*",
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
 
 /* -------------------------------------------
    ROUTES
@@ -69,7 +75,6 @@ app.use("/api/lecturer/classes", classRoutes);
 app.use("/api/lecturer/sessions", sessionRoutes);
 app.use("/api/student/attendance", attendanceRoutes);
 
-// Health route
 app.get("/", (req, res) => {
   res.send("QR Attendance Backend Running");
 });
@@ -79,11 +84,15 @@ app.get("/", (req, res) => {
 -------------------------------------------- */
 app.use((err, req, res, next) => {
   console.error(err.stack || err);
-  res.status(err.status || 500).json({ message: err.message || "Server Error" });
+  res.status(err.status || 500).json({
+    message: err.message || "Server Error",
+  });
 });
 
 /* -------------------------------------------
-   SERVER START
+   START SERVER
 -------------------------------------------- */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`Server running on port ${PORT}`)
+);
