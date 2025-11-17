@@ -1,4 +1,4 @@
-// src/pages/AuthPage.jsx
+// frontend/src/pages/AuthPage.jsx
 import React, { useState } from "react";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -8,8 +8,8 @@ export default function AuthPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [mode, setMode] = useState("login"); // 'login' | 'register'
-  const [role, setRole] = useState("lecturer"); // registration only
+  const [mode, setMode] = useState("login");
+  const [role, setRole] = useState("lecturer");
 
   const [form, setForm] = useState({
     name: "",
@@ -17,6 +17,7 @@ export default function AuthPage() {
     password: "",
     confirmPassword: "",
     studentId: "",
+    lecturerId: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -32,41 +33,36 @@ export default function AuthPage() {
       password: "",
       confirmPassword: "",
       studentId: "",
+      lecturerId: "",
     });
 
-  // -----------------------------
-  // HANDLE LOGIN
-  // -----------------------------
   const handleLogin = async () => {
     try {
-      // Try lecturer login first
+      // Try lecturer login
       try {
         const res = await api.post("/api/lecturer/login", {
           email: form.email,
           password: form.password,
         });
 
-        login(res.data.token, res.data.lecturer || res.data.user);
+        login(res.data.lecturer);
         navigate("/dashboard");
         return;
-      } catch (_) {}
+      } catch {}
 
-      // Try student login second
-    try {
-    const res = await api.post("/api/student/login", {
-        email: form.email,
-        password: form.password,
-    });
+      // Try student login
+      try {
+        const res = await api.post("/api/student/login", {
+          email: form.email,
+          password: form.password,
+        });
 
-    login(res.data.token, res.data.student || res.data.user);
-    navigate("/student/dashboard");  // <-- UPDATED
-    return;
-    } catch (_) {}
+        login(res.data.student);
+        navigate("/student/dashboard");
+        return;
+      } catch {}
 
-
-      // If both fail
       setMessage({ type: "error", text: "Invalid email or password" });
-
     } catch (err) {
       setMessage({
         type: "error",
@@ -75,14 +71,9 @@ export default function AuthPage() {
     }
   };
 
-  // -----------------------------
-  // HANDLE REGISTER
-  // -----------------------------
   const handleRegister = async () => {
-    if (form.password !== form.confirmPassword) {
-      setMessage({ type: "error", text: "Passwords do not match" });
-      return;
-    }
+    if (form.password !== form.confirmPassword)
+      return setMessage({ type: "error", text: "Passwords do not match" });
 
     try {
       if (role === "lecturer") {
@@ -90,6 +81,7 @@ export default function AuthPage() {
           name: form.name,
           email: form.email,
           password: form.password,
+          lecturerId: form.lecturerId,
         });
       } else {
         await api.post("/api/student/register", {
@@ -103,7 +95,6 @@ export default function AuthPage() {
       setMessage({ type: "success", text: "Registration successful!" });
       clearForm();
       setMode("login");
-
     } catch (err) {
       setMessage({
         type: "error",
@@ -117,11 +108,8 @@ export default function AuthPage() {
     setMessage(null);
     setLoading(true);
 
-    if (mode === "login") {
-      await handleLogin();
-    } else {
-      await handleRegister();
-    }
+    if (mode === "login") await handleLogin();
+    else await handleRegister();
 
     setLoading(false);
   };
@@ -133,7 +121,6 @@ export default function AuthPage() {
           {mode === "login" ? "Login" : "Register"}
         </h1>
 
-        {/* Mode Switch */}
         <div className="flex justify-center gap-3 mb-4">
           <button
             className={`px-3 py-1 rounded ${
@@ -158,7 +145,6 @@ export default function AuthPage() {
           </button>
         </div>
 
-        {/* Only show role selection during REGISTER */}
         {mode === "register" && (
           <>
             <label className="block mb-1 text-sm font-medium">I am a:</label>
@@ -173,7 +159,6 @@ export default function AuthPage() {
           </>
         )}
 
-        {/* Messages */}
         {message && (
           <div
             className={`p-3 mb-3 rounded text-center ${
@@ -187,7 +172,6 @@ export default function AuthPage() {
         )}
 
         <form className="space-y-3" onSubmit={handleSubmit}>
-          {/* Name (register only) */}
           {mode === "register" && (
             <input
               name="name"
@@ -198,7 +182,6 @@ export default function AuthPage() {
             />
           )}
 
-          {/* Email */}
           <input
             name="email"
             placeholder="Email"
@@ -208,7 +191,6 @@ export default function AuthPage() {
             type="email"
           />
 
-          {/* Password */}
           <input
             name="password"
             placeholder="Password"
@@ -218,7 +200,6 @@ export default function AuthPage() {
             onChange={handleChange}
           />
 
-          {/* Extra registration fields */}
           {mode === "register" && (
             <>
               <input
@@ -239,10 +220,19 @@ export default function AuthPage() {
                   onChange={handleChange}
                 />
               )}
+
+              {role === "lecturer" && (
+                <input
+                  name="lecturerId"
+                  placeholder="Lecturer ID"
+                  className="w-full border p-2 rounded"
+                  value={form.lecturerId}
+                  onChange={handleChange}
+                />
+              )}
             </>
           )}
 
-          {/* Submit button */}
           <button
             type="submit"
             disabled={loading}

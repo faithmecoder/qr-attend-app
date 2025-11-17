@@ -5,15 +5,28 @@ import generateAndSetToken from "../utils/generateToken.js";
 
 export const registerLecturer = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password)
+    const { name, email, password, lecturerId } = req.body;
+
+    if (!name || !email || !password || !lecturerId)
       return res.status(400).json({ message: "Missing fields" });
 
-    const existing = await Lecturer.findOne({ email });
-    if (existing) return res.status(400).json({ message: "Lecturer exists" });
+    const existingEmail = await Lecturer.findOne({ email });
+    if (existingEmail)
+      return res.status(400).json({ message: "Email already registered" });
+
+    const existingId = await Lecturer.findOne({ lecturerId });
+    if (existingId)
+      return res.status(400).json({ message: "Lecturer ID already exists" });
 
     const hashed = await bcrypt.hash(password, 10);
-    const newLecturer = new Lecturer({ name, email, password: hashed });
+
+    const newLecturer = new Lecturer({
+      name,
+      email,
+      password: hashed,
+      lecturerId,
+    });
+
     await newLecturer.save();
 
     res.status(201).json({ message: "Lecturer registered successfully" });
@@ -26,18 +39,27 @@ export const registerLecturer = async (req, res) => {
 export const loginLecturer = async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: "Missing fields" });
+    if (!email || !password)
+      return res.status(400).json({ message: "Missing fields" });
 
     const lecturer = await Lecturer.findOne({ email });
-    if (!lecturer) return res.status(400).json({ message: "Invalid credentials" });
+    if (!lecturer)
+      return res.status(400).json({ message: "Invalid credentials" });
 
     const isMatch = await bcrypt.compare(password, lecturer.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isMatch)
+      return res.status(400).json({ message: "Invalid credentials" });
 
     generateAndSetToken(res, lecturer._id, "lecturer");
 
-    // Return lecturer data (without password)
-    const safeLecturer = { _id: lecturer._id, name: lecturer.name, email: lecturer.email, role: lecturer.role };
+    const safeLecturer = {
+      _id: lecturer._id,
+      name: lecturer.name,
+      email: lecturer.email,
+      lecturerId: lecturer.lecturerId,
+      role: "lecturer",
+    };
+
     res.status(200).json({ lecturer: safeLecturer });
   } catch (err) {
     console.error("loginLecturer error:", err);
@@ -46,7 +68,6 @@ export const loginLecturer = async (req, res) => {
 };
 
 export const logoutLecturer = async (req, res) => {
-  // Clear cookie
   res.clearCookie("token", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

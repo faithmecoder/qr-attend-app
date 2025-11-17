@@ -1,45 +1,27 @@
 // src/context/AuthContext.jsx
-import React, { createContext, useContext, useEffect, useState } from "react";
-import api from "../services/api";
-import { useNavigate } from "react-router-dom";
+import React, { createContext, useContext, useState } from "react";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [token, setTokenState] = useState(localStorage.getItem("token"));
-  const [user, setUserState] = useState(
-    JSON.parse(localStorage.getItem("user")) || null
-  );
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(() => {
+    const stored = localStorage.getItem("user");
+    return stored ? JSON.parse(stored) : null;
+  });
 
-  const navigate = useNavigate();
-
-  // Keep axios interceptor behavior as-is (api attaches token from localStorage).
-  // If token exists but no user, optionally you could fetch profile here (not required).
-
-  const login = (tokenValue, userObj) => {
-    if (tokenValue) {
-      localStorage.setItem("token", tokenValue);
-      setTokenState(tokenValue);
-    }
-    if (userObj) {
-      localStorage.setItem("user", JSON.stringify(userObj));
-      setUserState(userObj);
-    }
+  // Called after successful login (lecturer or student)
+  const login = (userData) => {
+    localStorage.setItem("user", JSON.stringify(userData));
+    setUser(userData);
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
     localStorage.removeItem("user");
-    setTokenState(null);
-    setUserState(null);
-    navigate("/login");
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider
-      value={{ token, setToken: setTokenState, user, setUser: setUserState, login, logout, loading, setLoading }}
-    >
+    <AuthContext.Provider value={{ user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
