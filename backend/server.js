@@ -16,75 +16,82 @@ connectDB();
 
 const app = express();
 
-/* Trust proxy for Render/Heroku so secure cookies work behind load balancer */
+/* -----------------------------------------------------
+   TRUST PROXY (REQUIRED FOR RENDER + SECURE COOKIES)
+------------------------------------------------------ */
 app.set("trust proxy", 1);
 
+/* -----------------------------------------------------
+   MIDDLEWARE
+------------------------------------------------------ */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-/* CORS configuration */
+/* -----------------------------------------------------
+   FIXED CORS — Supports Android Chrome + iPhone Safari
+------------------------------------------------------ */
 const allowedOrigins = [
-  process.env.FRONTEND_URL, // production frontend
-  "http://localhost:5173",  // local Vite dev
+  process.env.FRONTEND_URL,  // Vercel
+  "http://localhost:5173",   // Local dev
+  null                       // Mobile Chrome / WebView
 ];
 
-console.log("Allowed CORS origins:", allowedOrigins);
+console.log("Allowed Origins:", allowedOrigins);
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-  if (!origin) return callback(null, true); // allow mobile apps & curl
+    origin: (origin, callback) => {
+      // 🌍 Mobile Chrome / Apps often send no origin
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
 
-  if (
-    allowedOrigins.includes(origin) ||
-    origin.startsWith(process.env.FRONTEND_URL)
-  ) {
-    return callback(null, true);
-  }
-
-  console.log("❌ Blocked by CORS:", origin);
-  return callback(new Error("CORS error: origin not allowed"));
-},
- credentials: true,
+      console.log("❌ BLOCKED ORIGIN:", origin);
+      return callback(new Error("CORS error: origin not allowed"));
+    },
+    credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-// enable preflight requests
-app.options("*", cors({ origin: allowedOrigins, credentials: true }));
+// Preflight for all routes
+app.options("*", cors());
 
-app.get("/api/check-origin", (req, res) => {
-  res.json({
-    originReceived: req.headers.origin || null,
-    userAgent: req.headers["user-agent"],
-    forwardedFor: req.headers["x-forwarded-for"],
-    cookie: req.headers.cookie || "none",
-    message: "Origin check OK",
-  });
-});
-
-/* ROUTES */
+/* -----------------------------------------------------
+   ROUTES
+------------------------------------------------------ */
 app.use("/api/lecturer", lecturerRoutes);
-app.use("/api/student", studentRoutes);          // e.g. GET /api/student/attendance
+app.use("/api/student", studentRoutes);
 app.use("/api/lecturer/classes", classRoutes);
 app.use("/api/lecturer/sessions", sessionRoutes);
-app.use("/api/student/attendance", attendanceRoutes);    // POST /api/attendance (mark attendance)
+app.use("/api/student/attendance", attendanceRoutes);
 
-/* Health */
+/* -----------------------------------------------------
+   HEALTH CHECK
+------------------------------------------------------ */
 app.get("/", (req, res) => {
-  res.send("QR Attendance Backend Running");
-});
-
-/* Error handler */
-app.use((err, req, res, next) => {
-  console.error(err.stack || err);
-  res.status(err.status || 500).json({
-    message: err.message || "Server Error",
+  res.json({
+    status: "QR Attendance Backend Running",
+    origin: req.headers.origin || null,
+    forwardedFor: req.headers["x-forwarded-for"] || null,
+    cookie: req.headers.cookie || "none",
   });
 });
 
-/* Start server */
+/* -----------------------------------------------------
+   GLOBAL ERROR HANDLER
+------------------------------------------------------ */
+app.use((err, req, res, next) => {
+  console.error("🔥 SERVER ERROR:", err.message);
+  res.status(500).json({ message: err.message || "Server Error" });
+});
+
+/* -----------------------------------------------------
+   START SERVER
+------------------------------------------------------ */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () =>
+  console.log(`🚀 Server running on port ${PORT}`)
+);
