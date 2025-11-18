@@ -1,3 +1,4 @@
+//frontend/ src/ components/StudentScanPage.jsx
 import React, { useEffect, useState, useRef } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import api from "../services/api";

@@ -2,20 +2,24 @@
 import jwt from "jsonwebtoken";
 
 /**
- * Generates a JWT and sets it as a Secure, HttpOnly cookie
+ * generateAndSetToken(res, id, role)
+ * Signs JWT and sets cookie named 'token'
  */
 const generateAndSetToken = (res, id, role) => {
   const token = jwt.sign({ id, role }, process.env.JWT_SECRET, {
     expiresIn: "30d",
   });
 
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: true,           // REQUIRED for Chrome & Android Chrome
-    sameSite: "None",       // REQUIRED when frontend != backend domain
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-  });
+  const isProd = process.env.NODE_ENV === "production";
 
+  const cookieOptions = {
+    httpOnly: true,
+    secure: isProd,                     // only secure in production
+    sameSite: isProd ? "None" : "Lax",  // None for cross-site in prod, Lax for dev
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  };
+
+  res.cookie("token", token, cookieOptions);
   return token;
 };
 

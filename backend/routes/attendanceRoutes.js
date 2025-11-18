@@ -1,12 +1,14 @@
-// backend/routes/sessionRoutes.js
+// backend/routes/attendanceRoutes.js
 import express from "express";
-import { startSession, reloadSession, getSessionAttendance } from "../controllers/sessionController.js";
-import { protect, lecturerAuth } from "../middleware/authMiddleware.js";
+import { markAttendance } from "../controllers/attendanceController.js";
+import { protect, studentAuth } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/start", protect, lecturerAuth, startSession);
-router.post("/reload", protect, lecturerAuth, reloadSession);
-router.get("/:id/attendance", protect, lecturerAuth, getSessionAttendance);
+/**
+ * Student marks attendance
+ * POST /api/attendance
+ */
+router.post("/", protect, studentAuth, markAttendance);
 
 export default router;
