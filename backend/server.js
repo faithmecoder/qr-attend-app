@@ -34,14 +34,19 @@ console.log("Allowed CORS origins:", allowedOrigins);
 app.use(
   cors({
     origin: function (origin, callback) {
-      // allow requests with no origin (mobile apps / Postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+  if (!origin) return callback(null, true); // allow mobile apps & curl
 
-      console.log("❌ Blocked by CORS:", origin);
-      return callback(new Error("CORS error: origin not allowed"));
-    },
-    credentials: true,
+  if (
+    allowedOrigins.includes(origin) ||
+    origin.startsWith(process.env.FRONTEND_URL)
+  ) {
+    return callback(null, true);
+  }
+
+  console.log("❌ Blocked by CORS:", origin);
+  return callback(new Error("CORS error: origin not allowed"));
+},
+ credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
@@ -50,12 +55,22 @@ app.use(
 // enable preflight requests
 app.options("*", cors({ origin: allowedOrigins, credentials: true }));
 
+app.get("/api/check-origin", (req, res) => {
+  res.json({
+    originReceived: req.headers.origin || null,
+    userAgent: req.headers["user-agent"],
+    forwardedFor: req.headers["x-forwarded-for"],
+    cookie: req.headers.cookie || "none",
+    message: "Origin check OK",
+  });
+});
+
 /* ROUTES */
 app.use("/api/lecturer", lecturerRoutes);
 app.use("/api/student", studentRoutes);          // e.g. GET /api/student/attendance
 app.use("/api/lecturer/classes", classRoutes);
 app.use("/api/lecturer/sessions", sessionRoutes);
-app.use("/api/attendance", attendanceRoutes);    // POST /api/attendance (mark attendance)
+app.use("/api/student/attendance", attendanceRoutes);    // POST /api/attendance (mark attendance)
 
 /* Health */
 app.get("/", (req, res) => {
