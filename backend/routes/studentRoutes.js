@@ -1,7 +1,12 @@
-// backend/routes/studentRoutes.js
+// backend/routes/studentsRoutes.js
 import express from "express";
-import { registerStudent, loginStudent, logoutStudent, getStudentAttendance } from "../controllers/studentController.js";
-import { protect, studentAuth } from "../middleware/authMiddleware.js";
+import {
+  registerStudent,
+  loginStudent,
+  logoutStudent,
+  getStudentAttendance,
+} from "../controllers/studentController.js";
+import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -9,7 +14,6 @@ router.post("/register", registerStudent);
 router.post("/login", loginStudent);
 router.post("/logout", logoutStudent);
 
-// optional: student can view own attendance history
-router.get("/attendance", protect, studentAuth, getStudentAttendance);
+router.get("/attendance", protect, getStudentAttendance);
 
 export default router;

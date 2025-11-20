@@ -1,14 +1,14 @@
-// src/App.jsx
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
 
-import LecturerDashboard from "./components/LecturerDashboard.jsx";
-import StudentScanPage from "./components/StudentScanPage.jsx";
-import StudentDashboard from "./pages/StudentDashboard.jsx";
-import AuthPage from "./pages/AuthPage.jsx";
+// Note: Removed .jsx extensions for better build compatibility
+import LecturerDashboard from "./components/LecturerDashboard";
+import StudentScanPage from "./components/StudentScanPage";
+import StudentDashboard from "./pages/StudentDashboard";
+import AuthPage from "./pages/AuthPage";
 
-import RequireAuth from "./components/RequireAuth.jsx";
-import { useAuth } from "./context/AuthContext.jsx";
+import RequireAuth from "./components/RequireAuth";
+import { useAuth } from "./context/AuthContext";
 
 function App() {
   const { user, logout } = useAuth();
@@ -24,12 +24,18 @@ function App() {
         <div className="flex items-center gap-4">
           {user ? (
             <>
-              <Link to="/dashboard" className="text-indigo-600 font-medium">
+              {/* Conditional Dashboard Link */}
+              <Link 
+                to={user.role === 'lecturer' ? "/dashboard" : "/student/dashboard"} 
+                className="text-indigo-600 font-medium"
+              >
                 Dashboard
               </Link>
+
               <span>Hello, {user.name}</span>
               <button
-                onClick={logout}
+                // CRITICAL FIX: Pass user.role to ensure the backend cookie is cleared
+                onClick={() => logout(user.role)} 
                 className="bg-red-500 text-white px-4 py-2 rounded"
               >
                 Logout
@@ -104,6 +110,18 @@ function Home() {
       <h1 className="text-4xl font-bold mb-4">Welcome to QR-Attend</h1>
 
       {!user && <p>Please login or register to continue.</p>}
+      {user && (
+        <p>
+          You are logged in as a {user.role}. Go to your{" "}
+          <Link 
+            to={user.role === 'lecturer' ? "/dashboard" : "/student/dashboard"} 
+            className="text-indigo-600 font-medium hover:underline"
+          >
+            Dashboard
+          </Link>{" "}
+          to continue.
+        </p>
+      )}
     </div>
   );
 }
