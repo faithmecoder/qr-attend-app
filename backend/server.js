@@ -34,14 +34,15 @@ app.use(cookieParser());
 const allowedOrigins = [
   process.env.FRONTEND_URL,  // Vercel
   "http://localhost:5173",   // Local dev
-  null                       // Mobile Chrome / WebView
+  undefined,   
+  null,                       // Mobile Chrome / WebView
 ];
 
 console.log("Allowed Origins:", allowedOrigins);
 
 app.use(
   cors({
-    origin: (origin, callback) => {
+    origin:  (origin, callback) => {
       // 🌍 Mobile Chrome / Apps often send no origin
       if (!origin || allowedOrigins.includes(origin)) {
         return callback(null, true);
@@ -55,6 +56,24 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+
+  app.options("*", cors({ origin: allowedOrigins, credentials: true }));
+
+  // ✅ ADD DEBUG ROUTE HERE
+  app.get("/debug/cookies", (req, res) => {
+    res.json({
+      origin: req.get("origin") || null,
+      referer: req.get("referer") || null,
+      userAgent: req.get("user-agent") || null,
+      cookies: req.cookies || {},
+      forwarded: req.headers["x-forwarded-for"] || req.ip,
+      message: "Debug OK",
+    });
+  });
+
+
+
 
 // Preflight for all routes
 app.options("*", cors());
@@ -84,7 +103,7 @@ app.get("/", (req, res) => {
    GLOBAL ERROR HANDLER
 ------------------------------------------------------ */
 app.use((err, req, res, next) => {
-  console.error("🔥 SERVER ERROR:", err.message);
+  console.error(" SERVER ERROR:", err.message);
   res.status(500).json({ message: err.message || "Server Error" });
 });
 
@@ -93,5 +112,5 @@ app.use((err, req, res, next) => {
 ------------------------------------------------------ */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
+  console.log(` Server running on port ${PORT}`)
 );
